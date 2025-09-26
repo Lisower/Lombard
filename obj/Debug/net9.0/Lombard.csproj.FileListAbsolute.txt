@@ -1,0 +1,14 @@
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\bin\Debug\net9.0\Lombard.exe
+C:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\bin\Debug\net9.0\Lombard.deps.json
+C:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\bin\Debug\net9.0\Lombard.runtimeconfig.json
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\bin\Debug\net9.0\Lombard.dll
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\bin\Debug\net9.0\Lombard.pdb
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.AssemblyInfoInputs.cache
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.AssemblyInfo.cs
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.csproj.CoreCompileInputs.cache
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.dll
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\refint\Lombard.dll
+c:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.pdb
+C:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\Lombard.genruntimeconfig.cache
+C:\Users\skida\OneDrive\Рабочий стол\Учёба\7-й семестр\Проектирование информационных систем\Lombard\obj\Debug\net9.0\ref\Lombard.dll
