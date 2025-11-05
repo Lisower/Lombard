@@ -15,6 +15,9 @@ namespace Lombard
         private Gender _gender;
         #endregion
 
+        private const string NamePattern = @"^[a-zA-Zа-яА-ЯёЁ\- ]+$";
+        private const string NamePatternOptional = @"^[a-zA-Zа-яА-ЯёЁ\- ]*$";
+
         #region Свойства
         public int Id => _id;
 
@@ -143,50 +146,49 @@ namespace Lombard
         #endregion
 
         #region Статические методы валидации
+        private static void ValidateStringLength(string value, string fieldName, int minLength = 2, int maxLength = 255)
+        {
+            if (value.Length < minLength)
+                throw new ArgumentException($"{fieldName} должна содержать минимум {minLength} символа");
+
+            if (value.Length > maxLength)
+                throw new ArgumentException($"{fieldName} не может превышать {maxLength} символов");
+        }
+
+        private static void ValidateStringFormat(string value, string pattern, string fieldName, string errorMessage)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(value, pattern))
+                throw new ArgumentException($"{fieldName} {errorMessage}");
+        }
+
+        private static void ValidateNameField(string value, string fieldName, bool isRequired = true)
+        {
+            if (isRequired && string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException($"{fieldName} не может быть пустым");
+
+            if (!isRequired && string.IsNullOrEmpty(value))
+                return;
+
+            ValidateStringFormat(value, isRequired ? NamePattern : NamePatternOptional,
+                fieldName, "может содержать только буквы, дефисы и пробелы");
+
+            ValidateStringLength(value, fieldName, 2, 255);
+        }
         public static bool ValidateLastName(string lastName)
         {
-            if (string.IsNullOrWhiteSpace(lastName))
-                throw new ArgumentException("Фамилия не может быть пустой");
-
-            if (!System.Text.RegularExpressions.Regex.IsMatch(lastName, @"^[a-zA-Zа-яА-ЯёЁ\- ]+$"))
-                throw new ArgumentException("Фамилия может содержать только буквы, дефисы и пробелы");
-
-            if (lastName.Length < 2)
-                throw new ArgumentException("Фамилия должна содержать минимум 2 символа");
-
-            if (lastName.Length > 255)
-                throw new ArgumentException("Фамилия не может превышать 255 символов");
-
+            ValidateNameField(lastName, "Фамилия");
             return true;
         }
 
         public static bool ValidateFirstName(string firstName)
         {
-            if (string.IsNullOrWhiteSpace(firstName))
-                throw new ArgumentException("Имя не может быть пустым");
-
-            if (!System.Text.RegularExpressions.Regex.IsMatch(firstName, @"^[a-zA-Zа-яА-ЯёЁ\- ]+$"))
-                throw new ArgumentException("Имя может содержать только буквы, дефисы и пробелы");
-
-            if (firstName.Length < 2)
-                throw new ArgumentException("Имя должно содержать минимум 2 символа");
-
-            if (firstName.Length > 255)
-                throw new ArgumentException("Имя не может превышать 255 символов");
-
+            ValidateNameField(firstName, "Имя");
             return true;
         }
 
         public static bool ValidatePatronymic(string patronymic)
         {
-            if (patronymic == null) return true;
-
-            if (!System.Text.RegularExpressions.Regex.IsMatch(patronymic, @"^[a-zA-Zа-яА-ЯёЁ\- ]*$"))
-                throw new ArgumentException("Отчество может содержать только буквы, дефисы и пробелы");
-
-            if (patronymic.Length > 255)
-                throw new ArgumentException("Отчество не может превышать 255 символов");
-
+            ValidateNameField(patronymic, "Отчество", false);
             return true;
         }
 
@@ -229,8 +231,7 @@ namespace Lombard
         {
             if (string.IsNullOrEmpty(email)) return true;
 
-            if (email.Length > 255)
-                throw new ArgumentException("Email не может превышать 255 символов");
+            ValidateStringLength(email, "Email", 0, 255);
 
             try
             {
