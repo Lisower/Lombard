@@ -3,7 +3,7 @@ namespace Lombard
     public class Client
     {
         #region Поля
-        private readonly int _id;
+        private int _id;
         private string _lastName;
         private string _firstName;
         private string _patronymic;
@@ -12,7 +12,7 @@ namespace Lombard
         private string _phoneNumber;
         private string _email;
         private DateTime _birthDate;
-        private Gender _gender;
+        private Genders _gender;
         #endregion
 
         private const string NamePattern = @"^[a-zA-Zа-яА-ЯёЁ\- ]+$";
@@ -101,7 +101,7 @@ namespace Lombard
             }
         }
 
-        public Gender ClientGender
+        public Genders Gender
         {
             get => _gender;
             set => _gender = value;
@@ -118,7 +118,7 @@ namespace Lombard
             string passportNumber,
             DateTime birthDate,
             string phoneNumber,
-            Gender gender,
+            Genders gender,
             string patronymic = null,
             string email = null,
             int id = 0
@@ -132,16 +132,92 @@ namespace Lombard
             PassportNumber = passportNumber;
             BirthDate = birthDate;
             PhoneNumber = phoneNumber;
-            ClientGender = gender;
+            Gender = gender;
             Email = email;
         }
         #endregion
 
+        #region Переопределённый конструктор
+
+        public Client(string serializedData, SerializationFormat format)
+        {
+            switch (format)
+            {
+                case SerializationFormat.Json:
+                    LoadFromJson(serializedData);
+                    break;
+                case SerializationFormat.Xml:
+                    LoadFromXml(serializedData);
+                    break;
+                default:
+                    throw new ArgumentException($"Неподдерживаемый формат: {format}");
+            }
+
+            if (!IsValid())
+                throw new ArgumentException("Некорректные данные клиента после десериализации");
+        }
+
+        private void LoadFromJson(string json)
+        {
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var client = System.Text.Json.JsonSerializer.Deserialize<Client>(json, options);
+            CopyFrom(client);
+        }
+
+        private void LoadFromXml(string xml)
+        {
+            using var reader = new System.IO.StringReader(xml);
+            var serializer = new System.Xml.Serialization.XmlSerializer(typeof(Client));
+            var client = (Client)serializer.Deserialize(reader);
+            CopyFrom(client);
+        }
+
+        private void CopyFrom(Client source)
+        {
+            if (source == null)
+                throw new ArgumentException("Некорректные данные");
+
+            var type = typeof(Client);
+            var fields = type.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            foreach (var field in fields)
+            {
+                var value = field.GetValue(source);
+                field.SetValue(this, value);
+            }
+        }
+
+        // Конструктор без параметров для десериализации
+        public Client()
+        {
+            _lastName = string.Empty;
+            _firstName = string.Empty;
+            _patronymic = string.Empty;
+            _passportSeries = string.Empty;
+            _passportNumber = string.Empty;
+            _phoneNumber = string.Empty;
+            _email = string.Empty;
+            _birthDate = DateTime.MinValue;
+            _gender = Genders.Male;
+        }
+        #endregion
+
         #region Перечисления
-        public enum Gender
+        public enum Genders
         {
             Male,
-            Female,
+            Female
+        }
+
+        public enum SerializationFormat
+        {
+            Json,
+            Xml,
+            Yaml
         }
         #endregion
 
@@ -265,9 +341,9 @@ namespace Lombard
             return true;
         }
 
-        public static bool ValidateGender(Gender gender)
+        public static bool ValidateGender(Genders gender)
         {
-            if (!Enum.IsDefined(typeof(Gender), gender))
+            if (!Enum.IsDefined(typeof(Genders), gender))
                 throw new ArgumentException("Некорректное значение пола");
 
             return true;
@@ -295,7 +371,7 @@ namespace Lombard
 
         public string GetFullInfo()
         {
-            return $"{ToString()}, паспорт: {GetFullPassportData()}, тел.: {PhoneNumber}, email: {Email}, возраст: {Age}";
+            return $"{ToString()}, пол: {Gender}, паспорт: {GetFullPassportData()}, тел.: {PhoneNumber}, email: {Email}, возраст: {Age}";
         }
 
         public bool IsValid()
