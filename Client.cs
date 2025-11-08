@@ -371,7 +371,13 @@ namespace Lombard
 
         public string GetFullInfo()
         {
-            return $"{ToString()}, пол: {Gender}, паспорт: {GetFullPassportData()}, тел.: {PhoneNumber}, email: {Email}, возраст: {Age}";
+            return $"{ToString()},\n" +
+                $"пол: {Gender},\n" +
+                $"паспорт: {GetFullPassportData()},\n" +
+                $"тел.: {PhoneNumber},\n" +
+                $"email: {Email},\n" +
+                $"дата рождения: {BirthDate.ToString("dd.MM.yyyy")}\n" +
+                $"возраст: {Age}\n";
         }
 
         public bool IsValid()
@@ -394,6 +400,66 @@ namespace Lombard
             {
                 return false;
             }
+        }
+
+        public void PrintFullInfo()
+        {
+            Console.WriteLine(GetFullInfo());
+        }
+
+        public void PrintShortInfo()
+        {
+            Console.WriteLine($"{ToString()},\n паспорт: {GetFullPassportData()},\n тел.: {PhoneNumber}\n");
+        }
+
+        public bool Equals(object obj)
+        {
+            if (obj is Client other)
+            {
+                return _id == other._id &&
+                       _lastName == other._lastName &&
+                       _firstName == other._firstName &&
+                       _patronymic == other._patronymic &&
+                       _passportSeries == other._passportSeries &&
+                       _passportNumber == other._passportNumber &&
+                       _phoneNumber == other._phoneNumber &&
+                       _email == other._email &&
+                       _birthDate == other._birthDate &&
+                       _gender == other._gender;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new HashCode();
+            hash.Add(_id);
+            hash.Add(_lastName);
+            hash.Add(_firstName);
+            hash.Add(_patronymic);
+            hash.Add(_passportSeries);
+            hash.Add(_passportNumber);
+            hash.Add(_phoneNumber);
+            hash.Add(_email);
+            hash.Add(_birthDate);
+            hash.Add(_gender);
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(Client left, Client right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+
+            if (left is null || right is null)
+                return false;
+
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(Client left, Client right)
+        {
+            return !(left == right);
         }
         #endregion
     }

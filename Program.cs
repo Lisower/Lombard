@@ -29,7 +29,7 @@
                 ""PassportNumber"": ""765931"",
                 ""PhoneNumber"": ""79987654321"",
                 ""Email"": ""petrov@example.com"",
-                ""BirthDate"": ""1990-05-15T00:00:00""
+                ""BirthDate"": ""1990-05-15""
             }";
 
             var clientFromJson = new Client(jsonData, Client.SerializationFormat.Json);
@@ -38,7 +38,7 @@
             // XML пример
             var xmlData = @"<?xml version=""1.0"" encoding=""utf-16""?>
             <Client>
-                <Id>1</Id>
+                <Id>2</Id>
                 <LastName>Сидоров</LastName>
                 <FirstName>Силр</FirstName>
                 <Patronymic>Сидорович</Patronymic>
@@ -46,11 +46,15 @@
                 <PassportNumber>567890</PassportNumber>
                 <PhoneNumber>79991234567</PhoneNumber>
                 <Email>sidorov@example.com</Email>
-                <BirthDate>1990-05-15T00:00:00</BirthDate>
+                <BirthDate>1990-05-15</BirthDate>
             </Client>";
 
             var clientFromXml = new Client(xmlData, Client.SerializationFormat.Xml);
             Console.WriteLine(clientFromXml.GetFullInfo());
+
+            // Проверка на равенство
+            Console.WriteLine(client.Equals(clientFromXml));
+            Console.WriteLine(client.Equals(client));
         }
     }
     #endregion
