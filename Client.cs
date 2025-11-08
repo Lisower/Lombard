@@ -1,18 +1,15 @@
 namespace Lombard
 {
-    public class Client
+    public class ClientShort
     {
         #region Поля
-        private int _id;
+        protected int _id;
         private string _lastName;
         private string _firstName;
         private string _patronymic;
         private string _passportSeries;
         private string _passportNumber;
         private string _phoneNumber;
-        private string _email;
-        private DateTime _birthDate;
-        private Genders _gender;
         #endregion
 
         private const string NamePattern = @"^[a-zA-Zа-яА-ЯёЁ\- ]+$";
@@ -20,7 +17,6 @@ namespace Lombard
 
         #region Свойства
         public int Id => _id;
-
         public string LastName
         {
             get => _lastName;
@@ -80,119 +76,27 @@ namespace Lombard
                 _phoneNumber = value;
             }
         }
-
-        public string Email
-        {
-            get => _email;
-            set
-            {
-                ValidateEmail(value);
-                _email = value;
-            }
-        }
-
-        public DateTime BirthDate
-        {
-            get => _birthDate;
-            set
-            {
-                ValidateBirthDate(value);
-                _birthDate = value;
-            }
-        }
-
-        public Genders Gender
-        {
-            get => _gender;
-            set => _gender = value;
-        }
-
-        public int Age => DateTime.Now.Year - _birthDate.Year - (DateTime.Now.DayOfYear < _birthDate.DayOfYear ? 1 : 0);
         #endregion
 
-        #region Конструктор
-        public Client(
+        #region Конструкторы
+        public ClientShort(
             string lastName,
             string firstName,
             string passportSeries,
             string passportNumber,
-            DateTime birthDate,
             string phoneNumber,
-            Genders gender,
-            string patronymic = null,
-            string email = null,
-            int id = 0
+            string patronymic = null
         )
         {
-            _id = id;
             LastName = lastName;
             FirstName = firstName;
             Patronymic = patronymic;
             PassportSeries = passportSeries;
             PassportNumber = passportNumber;
-            BirthDate = birthDate;
             PhoneNumber = phoneNumber;
-            Gender = gender;
-            Email = email;
-        }
-        #endregion
-
-        #region Переопределённый конструктор
-
-        public Client(string serializedData, SerializationFormat format)
-        {
-            switch (format)
-            {
-                case SerializationFormat.Json:
-                    LoadFromJson(serializedData);
-                    break;
-                case SerializationFormat.Xml:
-                    LoadFromXml(serializedData);
-                    break;
-                default:
-                    throw new ArgumentException($"Неподдерживаемый формат: {format}");
-            }
-
-            if (!IsValid())
-                throw new ArgumentException("Некорректные данные клиента после десериализации");
         }
 
-        private void LoadFromJson(string json)
-        {
-            var options = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-
-            var client = System.Text.Json.JsonSerializer.Deserialize<Client>(json, options);
-            CopyFrom(client);
-        }
-
-        private void LoadFromXml(string xml)
-        {
-            using var reader = new System.IO.StringReader(xml);
-            var serializer = new System.Xml.Serialization.XmlSerializer(typeof(Client));
-            var client = (Client)serializer.Deserialize(reader);
-            CopyFrom(client);
-        }
-
-        private void CopyFrom(Client source)
-        {
-            if (source == null)
-                throw new ArgumentException("Некорректные данные");
-
-            var type = typeof(Client);
-            var fields = type.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            foreach (var field in fields)
-            {
-                var value = field.GetValue(source);
-                field.SetValue(this, value);
-            }
-        }
-
-        // Конструктор без параметров для десериализации
-        public Client()
+        protected ClientShort()
         {
             _lastName = string.Empty;
             _firstName = string.Empty;
@@ -200,24 +104,6 @@ namespace Lombard
             _passportSeries = string.Empty;
             _passportNumber = string.Empty;
             _phoneNumber = string.Empty;
-            _email = string.Empty;
-            _birthDate = DateTime.MinValue;
-            _gender = Genders.Male;
-        }
-        #endregion
-
-        #region Перечисления
-        public enum Genders
-        {
-            Male,
-            Female
-        }
-
-        public enum SerializationFormat
-        {
-            Json,
-            Xml,
-            Yaml
         }
         #endregion
 
@@ -250,6 +136,7 @@ namespace Lombard
 
             ValidateStringLength(value, fieldName, 2, 255);
         }
+
         public static bool ValidateLastName(string lastName)
         {
             ValidateNameField(lastName, "Фамилия");
@@ -302,7 +189,174 @@ namespace Lombard
 
             return true;
         }
+        #endregion
 
+        #region Методы
+        public override string ToString()
+        {
+            return $"{LastName} {FirstName} {Patronymic}".Trim();
+        }
+
+        public string GetFullPassportData()
+        {
+            return $"{PassportSeries} {PassportNumber}";
+        }
+
+        public string GetShortInfo()
+        {
+            return $"{ToString()},\n паспорт: {GetFullPassportData()},\n тел.: {PhoneNumber}\n";
+        }
+
+        public void PrintShortInfo()
+        {
+            Console.WriteLine(GetShortInfo());
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is ClientShort other)
+            {
+                return _lastName == other._lastName &&
+                       _firstName == other._firstName &&
+                       _patronymic == other._patronymic &&
+                       _passportSeries == other._passportSeries &&
+                       _passportNumber == other._passportNumber &&
+                       _phoneNumber == other._phoneNumber;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new HashCode();
+            hash.Add(_lastName);
+            hash.Add(_firstName);
+            hash.Add(_patronymic);
+            hash.Add(_passportSeries);
+            hash.Add(_passportNumber);
+            hash.Add(_phoneNumber);
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(ClientShort left, ClientShort right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+
+            if (left is null || right is null)
+                return false;
+
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ClientShort left, ClientShort right)
+        {
+            return !(left == right);
+        }
+        #endregion
+    }
+
+    public class Client : ClientShort
+    {
+        #region Поля
+        private string _email;
+        private DateTime _birthDate;
+        private Genders _gender;
+        #endregion
+
+        #region Свойства
+
+        public string Email
+        {
+            get => _email;
+            set
+            {
+                ValidateEmail(value);
+                _email = value;
+            }
+        }
+
+        public DateTime BirthDate
+        {
+            get => _birthDate;
+            set
+            {
+                ValidateBirthDate(value);
+                _birthDate = value;
+            }
+        }
+
+        public Genders Gender
+        {
+            get => _gender;
+            set => _gender = value;
+        }
+
+        public int Age => DateTime.Now.Year - _birthDate.Year - (DateTime.Now.DayOfYear < _birthDate.DayOfYear ? 1 : 0);
+        #endregion
+
+        #region Конструкторы
+        public Client(
+            string lastName,
+            string firstName,
+            string passportSeries,
+            string passportNumber,
+            DateTime birthDate,
+            string phoneNumber,
+            Genders gender,
+            string patronymic = null,
+            string email = null,
+            int id = 0
+        ) : base(lastName, firstName, passportSeries, passportNumber, phoneNumber, patronymic)
+        {
+            _id = id;
+            BirthDate = birthDate;
+            Gender = gender;
+            Email = email;
+        }
+
+        public Client(string serializedData, SerializationFormat format)
+        {
+            switch (format)
+            {
+                case SerializationFormat.Json:
+                    LoadFromJson(serializedData);
+                    break;
+                case SerializationFormat.Xml:
+                    LoadFromXml(serializedData);
+                    break;
+                default:
+                    throw new ArgumentException($"Неподдерживаемый формат: {format}");
+            }
+
+            if (!IsValid())
+                throw new ArgumentException("Некорректные данные клиента после десериализации");
+        }
+
+        public Client() : base()
+        {
+            _email = string.Empty;
+            _birthDate = DateTime.MinValue;
+            _gender = Genders.Male;
+        }
+        #endregion
+
+        #region Перечисления
+        public enum Genders
+        {
+            Male,
+            Female
+        }
+
+        public enum SerializationFormat
+        {
+            Json,
+            Xml,
+            Yaml
+        }
+        #endregion
+
+        #region Статические методы валидации
         public static bool ValidateEmail(string email)
         {
             if (string.IsNullOrEmpty(email)) return true;
@@ -356,17 +410,53 @@ namespace Lombard
 
             return true;
         }
+
+        private static void ValidateStringLength(string value, string fieldName, int minLength = 2, int maxLength = 255)
+        {
+            if (value.Length < minLength)
+                throw new ArgumentException($"{fieldName} должна содержать минимум {minLength} символа");
+
+            if (value.Length > maxLength)
+                throw new ArgumentException($"{fieldName} не может превышать {maxLength} символов");
+        }
         #endregion
 
-        #region Обычные методы
-        public override string ToString()
+        #region Методы
+        private void LoadFromJson(string json)
         {
-            return $"{LastName} {FirstName} {Patronymic}".Trim();
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var client = System.Text.Json.JsonSerializer.Deserialize<Client>(json, options);
+            CopyFrom(client);
         }
 
-        public string GetFullPassportData()
+        private void LoadFromXml(string xml)
         {
-            return $"{PassportSeries} {PassportNumber}";
+            using var reader = new System.IO.StringReader(xml);
+            var serializer = new System.Xml.Serialization.XmlSerializer(typeof(Client));
+            var client = (Client)serializer.Deserialize(reader);
+            CopyFrom(client);
+        }
+
+        private void CopyFrom(Client source)
+        {
+            if (source == null)
+                throw new ArgumentException("Некорректные данные");
+
+            LastName = source.LastName;
+            FirstName = source.FirstName;
+            Patronymic = source.Patronymic;
+            PassportSeries = source.PassportSeries;
+            PassportNumber = source.PassportNumber;
+            PhoneNumber = source.PhoneNumber;
+
+            _id = source._id;
+            _email = source._email;
+            _birthDate = source._birthDate;
+            _gender = source._gender;
         }
 
         public string GetFullInfo()
@@ -384,15 +474,15 @@ namespace Lombard
         {
             try
             {
-                ValidateLastName(_lastName);
-                ValidateFirstName(_firstName);
-                ValidatePatronymic(_patronymic);
-                ValidatePassportSeries(_passportSeries);
-                ValidatePassportNumber(_passportNumber);
-                ValidatePhoneNumber(_phoneNumber);
-                ValidateEmail(_email);
-                ValidateBirthDate(_birthDate);
-                ValidateGender(_gender);
+                ValidateLastName(LastName);
+                ValidateFirstName(FirstName);
+                ValidatePatronymic(Patronymic);
+                ValidatePassportSeries(PassportSeries);
+                ValidatePassportNumber(PassportNumber);
+                ValidatePhoneNumber(PhoneNumber);
+                ValidateEmail(Email);
+                ValidateBirthDate(BirthDate);
+                ValidateGender(Gender);
                 ValidateId(_id);
                 return true;
             }
@@ -407,22 +497,12 @@ namespace Lombard
             Console.WriteLine(GetFullInfo());
         }
 
-        public void PrintShortInfo()
-        {
-            Console.WriteLine($"{ToString()},\n паспорт: {GetFullPassportData()},\n тел.: {PhoneNumber}\n");
-        }
-
-        public bool Equals(object obj)
+        public override bool Equals(object obj)
         {
             if (obj is Client other)
             {
-                return _id == other._id &&
-                       _lastName == other._lastName &&
-                       _firstName == other._firstName &&
-                       _patronymic == other._patronymic &&
-                       _passportSeries == other._passportSeries &&
-                       _passportNumber == other._passportNumber &&
-                       _phoneNumber == other._phoneNumber &&
+                return base.Equals(other) &&
+                       _id == other._id &&
                        _email == other._email &&
                        _birthDate == other._birthDate &&
                        _gender == other._gender;
@@ -433,13 +513,8 @@ namespace Lombard
         public override int GetHashCode()
         {
             HashCode hash = new HashCode();
+            hash.Add(base.GetHashCode());
             hash.Add(_id);
-            hash.Add(_lastName);
-            hash.Add(_firstName);
-            hash.Add(_patronymic);
-            hash.Add(_passportSeries);
-            hash.Add(_passportNumber);
-            hash.Add(_phoneNumber);
             hash.Add(_email);
             hash.Add(_birthDate);
             hash.Add(_gender);
