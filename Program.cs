@@ -1,61 +1,75 @@
 ﻿namespace Lombard
 {
-    #region Проверка класса
     public class Program
     {
         public static void Main(string[] args)
         {
-            Client client = new Client(
-                lastName: "Иванов",
-                firstName: "Иван",
-                patronymic: "Иванович",
-                passportSeries: "4501",
-                passportNumber: "123456",
-                birthDate: new DateTime(2005, 5, 15),
-                phoneNumber: "79123456789",
-                email: "ivanov@example.com",
-                gender: Client.Genders.Male
+            // Создание репозитория
+            var repo = new Client_rep_json("clients.json");
+
+            // i. Получить количество элементов
+            Console.WriteLine($"Всего клиентов: {repo.GetCount()}");
+
+            // d. Получить первые 10 элементов в коротком формате
+            var shortList = repo.GetShortList(0, 10);
+            foreach (var client in shortList)
+            {
+                Console.WriteLine(client.GetShortInfo());
+            }
+
+            // e. Сортировка по фамилии
+            repo.SortByLastName();
+
+            // c. Получить клиента по ID
+            try
+            {
+                var client = repo.GetById(1);
+                Console.WriteLine(client.GetFullInfo());
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            // f. Добавить нового клиента
+            var newClient = new Client(
+                10, // ID будет сгенерирован автоматически
+                "Иванов",
+                "Иван",
+                "1234",
+                "567890",
+                new DateTime(1990, 5, 15),
+                "+79161234567",
+                Client.Genders.Male,
+                "Иванович",
+                "ivanov@mail.ru"
             );
 
-            Console.WriteLine(client.GetFullInfo());
+            var addedClient = repo.Add(newClient);
+            Console.WriteLine($"Добавлен клиент с ID: {addedClient.Id}");
 
-            // JSON пример
-            var jsonData = @"{
-                ""Id"": 1,
-                ""LastName"": ""Петров"",
-                ""FirstName"": ""Пётр"",
-                ""Patronymic"": ""Петрович"",
-                ""PassportSeries"": ""4321"",
-                ""PassportNumber"": ""765931"",
-                ""PhoneNumber"": ""79987654321"",
-                ""Email"": ""petrov@example.com"",
-                ""BirthDate"": ""1990-05-15""
-            }";
+            // g. Обновить клиента
+            var updatedClient = new Client(
+                0, // ID будет заменен
+                "Иванов",
+                "Петр", // Изменили имя
+                "1234",
+                "567890",
+                new DateTime(1990, 5, 15),
+                "+79161234567",
+                Client.Genders.Male,
+                "Иванович",
+                "petr@mail.ru"
+            );
 
-            var clientFromJson = new Client(jsonData, Client.SerializationFormat.Json);
-            Console.WriteLine(clientFromJson.GetFullInfo());
+            repo.Update(addedClient.Id, updatedClient);
 
-            // XML пример
-            var xmlData = @"<?xml version=""1.0"" encoding=""utf-16""?>
-            <Client>
-                <Id>2</Id>
-                <LastName>Сидоров</LastName>
-                <FirstName>Силр</FirstName>
-                <Patronymic>Сидорович</Patronymic>
-                <PassportSeries>1234</PassportSeries>
-                <PassportNumber>567890</PassportNumber>
-                <PhoneNumber>79991234567</PhoneNumber>
-                <Email>sidorov@example.com</Email>
-                <BirthDate>1990-05-15</BirthDate>
-            </Client>";
-
-            var clientFromXml = new Client(xmlData, Client.SerializationFormat.Xml);
-            Console.WriteLine(clientFromXml.GetFullInfo());
-
-            // Проверка на равенство
-            Console.WriteLine(client.Equals(clientFromXml));
-            Console.WriteLine(client.Equals(client));
+            // h. Удалить клиента
+            bool deleted = repo.Delete(addedClient.Id);
+            if (deleted)
+            {
+                Console.WriteLine("Клиент удален");
+            }
         }
     }
-    #endregion
 }
