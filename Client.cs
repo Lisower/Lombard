@@ -80,6 +80,7 @@ namespace Lombard
 
         #region Конструкторы
         public ClientShort(
+            int id,
             string lastName,
             string firstName,
             string passportSeries,
@@ -88,6 +89,7 @@ namespace Lombard
             string patronymic = null
         )
         {
+            _id = id;
             LastName = lastName;
             FirstName = firstName;
             Patronymic = patronymic;
@@ -98,6 +100,7 @@ namespace Lombard
 
         protected ClientShort()
         {
+            _id = 0;
             _lastName = string.Empty;
             _firstName = string.Empty;
             _patronymic = string.Empty;
@@ -189,6 +192,13 @@ namespace Lombard
 
             return true;
         }
+        public static bool ValidateId(int id)
+        {
+            if (id < 0)
+                throw new ArgumentException("ID не может быть отрицательным");
+
+            return true;
+        }
         #endregion
 
         #region Методы
@@ -224,34 +234,6 @@ namespace Lombard
                        _phoneNumber == other._phoneNumber;
             }
             return false;
-        }
-
-        public override int GetHashCode()
-        {
-            HashCode hash = new HashCode();
-            hash.Add(_lastName);
-            hash.Add(_firstName);
-            hash.Add(_patronymic);
-            hash.Add(_passportSeries);
-            hash.Add(_passportNumber);
-            hash.Add(_phoneNumber);
-            return hash.ToHashCode();
-        }
-
-        public static bool operator ==(ClientShort left, ClientShort right)
-        {
-            if (ReferenceEquals(left, right))
-                return true;
-
-            if (left is null || right is null)
-                return false;
-
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(ClientShort left, ClientShort right)
-        {
-            return !(left == right);
         }
         #endregion
     }
@@ -297,6 +279,7 @@ namespace Lombard
 
         #region Конструкторы
         public Client(
+            int id,
             string lastName,
             string firstName,
             string passportSeries,
@@ -305,11 +288,9 @@ namespace Lombard
             string phoneNumber,
             Genders gender,
             string patronymic = null,
-            string email = null,
-            int id = 0
-        ) : base(lastName, firstName, passportSeries, passportNumber, phoneNumber, patronymic)
+            string email = null
+        ) : base(id, lastName, firstName, passportSeries, passportNumber, phoneNumber, patronymic)
         {
-            _id = id;
             BirthDate = birthDate;
             Gender = gender;
             Email = email;
@@ -337,7 +318,7 @@ namespace Lombard
         {
             _email = string.Empty;
             _birthDate = DateTime.MinValue;
-            _gender = Genders.Male;
+            _gender = Genders.NA;
         }
         #endregion
 
@@ -345,14 +326,14 @@ namespace Lombard
         public enum Genders
         {
             Male,
-            Female
+            Female,
+            NA
         }
 
         public enum SerializationFormat
         {
             Json,
-            Xml,
-            Yaml
+            Xml
         }
         #endregion
 
@@ -403,14 +384,6 @@ namespace Lombard
             return true;
         }
 
-        public static bool ValidateId(int id)
-        {
-            if (id < 0)
-                throw new ArgumentException("ID не может быть отрицательным");
-
-            return true;
-        }
-
         private static void ValidateStringLength(string value, string fieldName, int minLength = 2, int maxLength = 255)
         {
             if (value.Length < minLength)
@@ -446,6 +419,7 @@ namespace Lombard
             if (source == null)
                 throw new ArgumentException("Некорректные данные");
 
+            _id = source.Id;
             LastName = source.LastName;
             FirstName = source.FirstName;
             Patronymic = source.Patronymic;
@@ -453,7 +427,6 @@ namespace Lombard
             PassportNumber = source.PassportNumber;
             PhoneNumber = source.PhoneNumber;
 
-            _id = source._id;
             _email = source._email;
             _birthDate = source._birthDate;
             _gender = source._gender;
@@ -483,7 +456,7 @@ namespace Lombard
                 ValidateEmail(Email);
                 ValidateBirthDate(BirthDate);
                 ValidateGender(Gender);
-                ValidateId(_id);
+                ValidateId(Id);
                 return true;
             }
             catch
@@ -495,46 +468,6 @@ namespace Lombard
         public void PrintFullInfo()
         {
             Console.WriteLine(GetFullInfo());
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is Client other)
-            {
-                return base.Equals(other) &&
-                       _id == other._id &&
-                       _email == other._email &&
-                       _birthDate == other._birthDate &&
-                       _gender == other._gender;
-            }
-            return false;
-        }
-
-        public override int GetHashCode()
-        {
-            HashCode hash = new HashCode();
-            hash.Add(base.GetHashCode());
-            hash.Add(_id);
-            hash.Add(_email);
-            hash.Add(_birthDate);
-            hash.Add(_gender);
-            return hash.ToHashCode();
-        }
-
-        public static bool operator ==(Client left, Client right)
-        {
-            if (ReferenceEquals(left, right))
-                return true;
-
-            if (left is null || right is null)
-                return false;
-
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(Client left, Client right)
-        {
-            return !(left == right);
         }
         #endregion
     }
