@@ -1,49 +1,54 @@
 ﻿using Npgsql;
-using System.Data;
 
 namespace Lombard
 {
     internal class Client_rep_DB
     {
-        private readonly string _connectionString;
+        private readonly DatabaseConnectionManager _dbManager;
 
         public Client_rep_DB(string connectionString)
         {
-            _connectionString = connectionString;
+            // Получаем Singleton экземпляр менеджера подключений
+            _dbManager = DatabaseConnectionManager.GetInstance(connectionString);
+
+            // Открываем соединение при создании репозитория
+            _dbManager.OpenConnection();
         }
 
-        #region Основные методы
+        // Альтернативный конструктор для использования существующего экземпляра
+        public Client_rep_DB()
+        {
+            _dbManager = DatabaseConnectionManager.GetInstance();
+            _dbManager.OpenConnection();
+        }
+
+        #region Основные методы (с использованием делегирования)
 
         // Получить объект по ID
         public Client GetById(int id)
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = @"
+                SELECT 
+                    client_id, last_name, first_name, patronymic, 
+                    passport_series, passport_number, phone_number, 
+                    email, birth_date, gender
+                FROM Clients 
+                WHERE client_id = @id";
+
+            var parameters = new[]
             {
-                connection.Open();
+                new NpgsqlParameter("@id", id)
+            };
 
-                var query = @"
-                    SELECT 
-                        client_id, last_name, first_name, patronymic, 
-                        passport_series, passport_number, phone_number, 
-                        email, birth_date, gender
-                    FROM Clients 
-                    WHERE client_id = @id";
-
-                using (var command = new NpgsqlCommand(query, connection))
+            using (var reader = _dbManager.ExecuteReader(query, parameters))
+            {
+                if (reader.Read())
                 {
-                    command.Parameters.AddWithValue("@id", id);
-
-                    using (var reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return MapToClient(reader);
-                        }
-                        else
-                        {
-                            throw new ArgumentException($"Клиент с ID {id} не найден");
-                        }
-                    }
+                    return MapToClient(reader);
+                }
+                else
+                {
+                    throw new ArgumentException($"Клиент с ID {id} не найден");
                 }
             }
         }
@@ -59,98 +64,83 @@ namespace Lombard
 
             var clients = new List<ClientShort>();
 
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = @"
+                SELECT 
+                    client_id, last_name, first_name, 
+                    passport_series, passport_number, phone_number,
+                    patronymic
+                FROM Clients 
+                ORDER BY client_id
+                LIMIT @count OFFSET @offset";
+
+            var parameters = new[]
             {
-                connection.Open();
+                new NpgsqlParameter("@count", count),
+                new NpgsqlParameter("@offset", offset)
+            };
 
-                // В PostgreSQL используем LIMIT и OFFSET
-                var query = @"
-                    SELECT 
-                        client_id, last_name, first_name, patronymic, 
-                        passport_series, passport_number, phone_number
-                    FROM Clients 
-                    ORDER BY client_id
-                    LIMIT @count OFFSET @offset";
-
-                using (var command = new NpgsqlCommand(query, connection))
+            using (var reader = _dbManager.ExecuteReader(query, parameters))
+            {
+                while (reader.Read())
                 {
-                    command.Parameters.AddWithValue("@count", count);
-                    command.Parameters.AddWithValue("@offset", count * (offset - 1));
-
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            var clientShort = new ClientShort(
-                                reader.GetInt32(0),       // client_id
-                                reader.GetString(1),      // last_name
-                                reader.GetString(2),      // first_name
-                                reader.GetString(4),      // passport_series
-                                reader.GetString(5),      // passport_number
-                                reader.GetString(6),      // phone_number
-                                reader.IsDBNull(3) ? null : reader.GetString(3)  // patronymic
-                            );
-                            clients.Add(clientShort);
-                        }
-                    }
+                    var clientShort = new ClientShort(
+                        reader.GetInt32(0),       // client_id
+                        reader.GetString(1),      // last_name
+                        reader.GetString(2),      // first_name
+                        reader.GetString(3),      // passport_series
+                        reader.GetString(4),      // passport_number
+                        reader.GetString(5),      // phone_number
+                        reader.IsDBNull(6) ? null : reader.GetString(6)  // patronymic
+                    );
+                    clients.Add(clientShort);
                 }
             }
 
             return clients;
         }
 
-        // Добавить объект в список
+        // Добавить объект в список (при добавлении сформировать новый ID)
         public Client Add(Client client)
         {
             if (client == null)
                 throw new ArgumentNullException(nameof(client));
 
-            // Проверяем валидность клиента
             if (!client.IsValid())
                 throw new ArgumentException("Некорректные данные клиента");
 
-            // Проверяем уникальность данных
             CheckUniqueness(client, null);
 
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                connection.Open();
+            var query = @"
+                INSERT INTO Clients (
+                    last_name, first_name, patronymic, 
+                    passport_series, passport_number, phone_number, 
+                    email, birth_date, gender
+                ) 
+                VALUES (
+                    @last_name, @first_name, @patronymic, 
+                    @passport_series, @passport_number, @phone_number, 
+                    @email, @birth_date, @gender
+                ) 
+                RETURNING client_id";
 
-                var query = @"
-                    INSERT INTO Clients (
-                        last_name, first_name, patronymic, 
-                        passport_series, passport_number, phone_number, 
-                        email, birth_date, gender
-                    ) 
-                    VALUES (
-                        @last_name, @first_name, @patronymic, 
-                        @passport_series, @passport_number, @phone_number, 
-                        @email, @birth_date, @gender
-                    ) 
-                    RETURNING client_id";
+            var parameters = CreateClientParameters(client);
 
-                using (var command = new NpgsqlCommand(query, connection))
-                {
-                    AddClientParameters(command, client);
+            // Выполняем вставку и получаем сгенерированный ID
+            var newId = (int)_dbManager.ExecuteScalar(query, parameters);
 
-                    // Выполняем вставку и получаем сгенерированный ID
-                    var newId = (int)command.ExecuteScalar();
-
-                    // Создаем клиента с присвоенным ID
-                    return new Client(
-                        newId,
-                        client.LastName,
-                        client.FirstName,
-                        client.PassportSeries,
-                        client.PassportNumber,
-                        client.BirthDate,
-                        client.PhoneNumber,
-                        client.Gender,
-                        client.Patronymic,
-                        client.Email
-                    );
-                }
-            }
+            // Создаем клиента с присвоенным ID
+            return new Client(
+                newId,
+                client.LastName,
+                client.FirstName,
+                client.PassportSeries,
+                client.PassportNumber,
+                client.BirthDate,
+                client.PhoneNumber,
+                client.Gender,
+                client.Patronymic,
+                client.Email
+            );
         }
 
         // Заменить элемент списка по ID
@@ -159,49 +149,41 @@ namespace Lombard
             if (updatedClient == null)
                 throw new ArgumentNullException(nameof(updatedClient));
 
-            // Проверяем валидность клиента
             if (!updatedClient.IsValid())
                 throw new ArgumentException("Некорректные данные клиента");
 
             // Проверяем существование клиента
             var existing = GetById(id);
 
-            // Проверяем уникальность данных (исключая текущего клиента)
             CheckUniqueness(updatedClient, id);
 
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = @"
+                UPDATE Clients 
+                SET 
+                    last_name = @last_name,
+                    first_name = @first_name,
+                    patronymic = @patronymic,
+                    passport_series = @passport_series,
+                    passport_number = @passport_number,
+                    phone_number = @phone_number,
+                    email = @email,
+                    birth_date = @birth_date,
+                    gender = @gender
+                WHERE client_id = @id";
+
+            var parameters = CreateClientParameters(updatedClient);
+            // Добавляем параметр ID в начало массива
+            var allParameters = new NpgsqlParameter[parameters.Length + 1];
+            allParameters[0] = new NpgsqlParameter("@id", id);
+            Array.Copy(parameters, 0, allParameters, 1, parameters.Length);
+
+            int rowsAffected = _dbManager.ExecuteNonQuery(query, allParameters);
+
+            if (rowsAffected == 0)
             {
-                connection.Open();
-
-                var query = @"
-                    UPDATE Clients 
-                    SET 
-                        last_name = @last_name,
-                        first_name = @first_name,
-                        patronymic = @patronymic,
-                        passport_series = @passport_series,
-                        passport_number = @passport_number,
-                        phone_number = @phone_number,
-                        email = @email,
-                        birth_date = @birth_date,
-                        gender = @gender
-                    WHERE client_id = @id";
-
-                using (var command = new NpgsqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@id", id);
-                    AddClientParameters(command, updatedClient);
-
-                    int rowsAffected = command.ExecuteNonQuery();
-
-                    if (rowsAffected == 0)
-                    {
-                        throw new ArgumentException($"Клиент с ID {id} не найден");
-                    }
-                }
+                throw new ArgumentException($"Клиент с ID {id} не найден");
             }
 
-            // Возвращаем обновленного клиента
             return new Client(
                 id,
                 updatedClient.LastName,
@@ -219,37 +201,24 @@ namespace Lombard
         // Удалить элемент списка по ID
         public bool Delete(int id)
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = "DELETE FROM Clients WHERE client_id = @id";
+
+            var parameters = new[]
             {
-                connection.Open();
+                new NpgsqlParameter("@id", id)
+            };
 
-                var query = "DELETE FROM Clients WHERE client_id = @id";
-
-                using (var command = new NpgsqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@id", id);
-
-                    int rowsAffected = command.ExecuteNonQuery();
-                    return rowsAffected > 0;
-                }
-            }
+            int rowsAffected = _dbManager.ExecuteNonQuery(query, parameters);
+            return rowsAffected > 0;
         }
 
         // Получить количество элементов
         public int GetCount()
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                connection.Open();
+            var query = "SELECT COUNT(*) FROM Clients";
 
-                var query = "SELECT COUNT(*) FROM Clients";
-
-                using (var command = new NpgsqlCommand(query, connection))
-                {
-                    var result = command.ExecuteScalar();
-                    return Convert.ToInt32(result);
-                }
-            }
+            var result = _dbManager.ExecuteScalar(query);
+            return Convert.ToInt32(result);
         }
 
         #endregion
@@ -266,118 +235,107 @@ namespace Lombard
                 reader.GetString(5),          // passport_number
                 reader.GetDateTime(8),        // birth_date
                 reader.GetString(6),          // phone_number
-                reader.GetString(9)[0] == 'M' ? Client.Genders.Male : Client.Genders.Female, // gender (первый символ)
+                reader.GetString(9)[0] == 'M' ? Client.Genders.Male : Client.Genders.Female, // gender
                 reader.IsDBNull(3) ? null : reader.GetString(3),  // patronymic
                 reader.IsDBNull(7) ? null : reader.GetString(7)   // email
             );
         }
 
-        private void AddClientParameters(NpgsqlCommand command, Client client)
+        private NpgsqlParameter[] CreateClientParameters(Client client)
         {
-            command.Parameters.AddWithValue("@last_name", client.LastName);
-            command.Parameters.AddWithValue("@first_name", client.FirstName);
-            command.Parameters.AddWithValue("@passport_series", client.PassportSeries);
-            command.Parameters.AddWithValue("@passport_number", client.PassportNumber);
-            command.Parameters.AddWithValue("@phone_number", client.PhoneNumber);
-            command.Parameters.AddWithValue("@birth_date", client.BirthDate);
-            command.Parameters.AddWithValue("@gender", client.Gender == Client.Genders.Male ? 'M' : (client.Gender == Client.Genders.Female ? 'M' : DBNull.Value));
-
-            // Обрабатываем nullable поля
-            if (client.Patronymic != null)
-                command.Parameters.AddWithValue("@patronymic", client.Patronymic);
-            else
-                command.Parameters.AddWithValue("@patronymic", DBNull.Value);
-
-            if (client.Email != null)
-                command.Parameters.AddWithValue("@email", client.Email);
-            else
-                command.Parameters.AddWithValue("@email", DBNull.Value);
+            return new[]
+            {
+                new NpgsqlParameter("@last_name", client.LastName),
+                new NpgsqlParameter("@first_name", client.FirstName),
+                new NpgsqlParameter("@patronymic", (object)client.Patronymic ?? DBNull.Value),
+                new NpgsqlParameter("@passport_series", client.PassportSeries),
+                new NpgsqlParameter("@passport_number", client.PassportNumber),
+                new NpgsqlParameter("@phone_number", client.PhoneNumber),
+                new NpgsqlParameter("@email", (object)client.Email ?? DBNull.Value),
+                new NpgsqlParameter("@birth_date", client.BirthDate),
+                new NpgsqlParameter("@gender", client.Gender == Client.Genders.Male ? 'M' : (client.Gender == Client.Genders.Female ? 'F' : DBNull.Value))
+            };
         }
 
         private void CheckUniqueness(Client client, int? excludeId)
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            // Проверка паспортных данных
+            var passportQuery = @"
+                SELECT COUNT(*) 
+                FROM Clients 
+                WHERE passport_series = @series 
+                  AND passport_number = @number";
+
+            if (excludeId.HasValue)
             {
-                connection.Open();
+                passportQuery += " AND client_id != @excludeId";
+            }
 
-                // Проверка паспортных данных
-                var passportQuery = @"
-                    SELECT COUNT(*) 
-                    FROM Clients 
-                    WHERE passport_series = @series 
-                      AND passport_number = @number";
+            var passportParams = new List<NpgsqlParameter>
+            {
+                new NpgsqlParameter("@series", client.PassportSeries),
+                new NpgsqlParameter("@number", client.PassportNumber)
+            };
+
+            if (excludeId.HasValue)
+            {
+                passportParams.Add(new NpgsqlParameter("@excludeId", excludeId.Value));
+            }
+
+            var passportCount = Convert.ToInt32(_dbManager.ExecuteScalar(passportQuery, passportParams.ToArray()));
+            if (passportCount > 0)
+            {
+                throw new ArgumentException("Клиент с такими паспортными данными уже существует!");
+            }
+
+            // Проверка номера телефона
+            var phoneQuery = "SELECT COUNT(*) FROM Clients WHERE phone_number = @phone";
+
+            if (excludeId.HasValue)
+            {
+                phoneQuery += " AND client_id != @excludeId";
+            }
+
+            var phoneParams = new List<NpgsqlParameter>
+            {
+                new NpgsqlParameter("@phone", client.PhoneNumber)
+            };
+
+            if (excludeId.HasValue)
+            {
+                phoneParams.Add(new NpgsqlParameter("@excludeId", excludeId.Value));
+            }
+
+            var phoneCount = Convert.ToInt32(_dbManager.ExecuteScalar(phoneQuery, phoneParams.ToArray()));
+            if (phoneCount > 0)
+            {
+                throw new ArgumentException("Клиент с таким номером телефона уже существует!");
+            }
+
+            // Проверка email (если указан)
+            if (!string.IsNullOrWhiteSpace(client.Email))
+            {
+                var emailQuery = "SELECT COUNT(*) FROM Clients WHERE email = @email";
 
                 if (excludeId.HasValue)
                 {
-                    passportQuery += " AND client_id != @excludeId";
+                    emailQuery += " AND client_id != @excludeId";
                 }
 
-                using (var command = new NpgsqlCommand(passportQuery, connection))
+                var emailParams = new List<NpgsqlParameter>
                 {
-                    command.Parameters.AddWithValue("@series", client.PassportSeries);
-                    command.Parameters.AddWithValue("@number", client.PassportNumber);
-
-                    if (excludeId.HasValue)
-                    {
-                        command.Parameters.AddWithValue("@excludeId", excludeId.Value);
-                    }
-
-                    var count = Convert.ToInt32(command.ExecuteScalar());
-                    if (count > 0)
-                    {
-                        throw new ArgumentException("Клиент с такими паспортными данными уже существует!");
-                    }
-                }
-
-                // Проверка номера телефона
-                var phoneQuery = "SELECT COUNT(*) FROM Clients WHERE phone_number = @phone";
+                    new NpgsqlParameter("@email", client.Email)
+                };
 
                 if (excludeId.HasValue)
                 {
-                    phoneQuery += " AND client_id != @excludeId";
+                    emailParams.Add(new NpgsqlParameter("@excludeId", excludeId.Value));
                 }
 
-                using (var command = new NpgsqlCommand(phoneQuery, connection))
+                var emailCount = Convert.ToInt32(_dbManager.ExecuteScalar(emailQuery, emailParams.ToArray()));
+                if (emailCount > 0)
                 {
-                    command.Parameters.AddWithValue("@phone", client.PhoneNumber);
-
-                    if (excludeId.HasValue)
-                    {
-                        command.Parameters.AddWithValue("@excludeId", excludeId.Value);
-                    }
-
-                    var count = Convert.ToInt32(command.ExecuteScalar());
-                    if (count > 0)
-                    {
-                        throw new ArgumentException("Клиент с таким номером телефона уже существует!");
-                    }
-                }
-
-                // Проверка email (если указан)
-                if (!string.IsNullOrWhiteSpace(client.Email))
-                {
-                    var emailQuery = "SELECT COUNT(*) FROM Clients WHERE email = @email";
-
-                    if (excludeId.HasValue)
-                    {
-                        emailQuery += " AND client_id != @excludeId";
-                    }
-
-                    using (var command = new NpgsqlCommand(emailQuery, connection))
-                    {
-                        command.Parameters.AddWithValue("@email", client.Email);
-
-                        if (excludeId.HasValue)
-                        {
-                            command.Parameters.AddWithValue("@excludeId", excludeId.Value);
-                        }
-
-                        var count = Convert.ToInt32(command.ExecuteScalar());
-                        if (count > 0)
-                        {
-                            throw new ArgumentException("Клиент с таким Email уже существует!");
-                        }
-                    }
+                    throw new ArgumentException("Клиент с таким Email уже существует!");
                 }
             }
         }
@@ -390,27 +348,19 @@ namespace Lombard
         {
             var clients = new List<Client>();
 
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = @"
+                SELECT 
+                    client_id, last_name, first_name, patronymic, 
+                    passport_series, passport_number, phone_number, 
+                    email, birth_date, gender
+                FROM Clients 
+                ORDER BY client_id";
+
+            using (var reader = _dbManager.ExecuteReader(query))
             {
-                connection.Open();
-
-                var query = @"
-                    SELECT 
-                        client_id, last_name, first_name, patronymic, 
-                        passport_series, passport_number, phone_number, 
-                        email, birth_date, gender
-                    FROM Clients 
-                    ORDER BY client_id";
-
-                using (var command = new NpgsqlCommand(query, connection))
+                while (reader.Read())
                 {
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            clients.Add(MapToClient(reader));
-                        }
-                    }
+                    clients.Add(MapToClient(reader));
                 }
             }
 
@@ -421,34 +371,38 @@ namespace Lombard
         {
             var clients = new List<Client>();
 
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var query = @"
+                SELECT 
+                    client_id, last_name, first_name, patronymic, 
+                    passport_series, passport_number, phone_number, 
+                    email, birth_date, gender
+                FROM Clients 
+                WHERE LOWER(last_name) LIKE LOWER(@pattern)
+                ORDER BY last_name, first_name";
+
+            var parameters = new[]
             {
-                connection.Open();
+                new NpgsqlParameter("@pattern", $"%{lastName}%")
+            };
 
-                var query = @"
-                    SELECT 
-                        client_id, last_name, first_name, patronymic, 
-                        passport_series, passport_number, phone_number, 
-                        email, birth_date, gender
-                    FROM Clients 
-                    WHERE LOWER(last_name) LIKE LOWER(@pattern)
-                    ORDER BY last_name, first_name";
-
-                using (var command = new NpgsqlCommand(query, connection))
+            using (var reader = _dbManager.ExecuteReader(query, parameters))
+            {
+                while (reader.Read())
                 {
-                    command.Parameters.AddWithValue("@pattern", $"%{lastName}%");
-
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            clients.Add(MapToClient(reader));
-                        }
-                    }
+                    clients.Add(MapToClient(reader));
                 }
             }
 
             return clients;
+        }
+
+        #endregion
+
+        #region IDisposable
+        public void Dispose()
+        {
+            // Не закрываем соединение полностью, так как это Singleton
+            // Просто освобождаем ресурсы этого репозитория
         }
 
         #endregion
